@@ -1,11 +1,16 @@
 module serve
 
 import net
-import vweb
+import veb
 import os
 
-struct Context {
-	vweb.Context
+pub struct App {
+	veb.StaticHandler	
+	veb.Middleware[Context]
+}
+
+pub struct Context {
+	veb.Context
 }
 
 // serve_static serves a UI that has been built into a static site on localhost and
@@ -27,13 +32,18 @@ pub fn serve_static(ui_path string, port u16) !u16 {
 		final_port++
 	}
 	spawn fn [ui_path, final_port] () {
-		mut web_ctx := Context{}
-		web_ctx.mount_static_folder_at(ui_path, '/')
-		vweb.run(web_ctx, final_port)
+		mut app := &App{}
+		app.mount_static_folder_at(ui_path,'/') or { panic(err) }
+		veb.run_at[App, Context](mut app, veb.RunParams{
+			host:                 'localhost'
+			port:                 final_port
+			family:               .ip
+			show_startup_message: false
+		}) or { panic(err) }
 	}()
 	return final_port
 }
 
-fn (mut ctx Context) index() vweb.Result {
-	return ctx.html(os.read_file(ctx.static_files['/index.html']) or { panic(err) })
+fn (app &App) index(mut ctx Context) veb.Result {
+	return ctx.html(os.read_file(app.static_files['/index.html']) or { panic(err) })
 }
